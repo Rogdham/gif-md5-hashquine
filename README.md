@@ -25,9 +25,11 @@ created a GIF MD5 hashquine before, but I did not know at that time.
 How did you do it?
 ------------------
 
-Stay tuned for the write up!
+Please read [my detailed write up][writeup] or look at [the source code](src)
+use to generate it.
 
-In the meanwhile, you can look at [the source code](src) used to generate it.
+
+[writeup]: http://r.rogdham.net/30
 
 
 What about the licence?
