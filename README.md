@@ -27,11 +27,7 @@ How did you do it?
 
 Stay tuned for the write up!
 
-
-Could you release the source code? I want to generate my own
-------------------------------------------------------------
-
-Definitively, hold still!
+In the meanwhile, you can look at [the source code](src) used to generate it.
 
 
 What about the licence?
@@ -45,5 +41,10 @@ the file:
     <3 Copying is an act of love. Please copy and share.
     Released under the CC0 1.0 universel licence
     See https://creativecommons.org/publicdomain/zero/1.0/deed.fr
+
+The source code is also released under the [CC0][] licence, making it a free
+software. See the header of each file for more information. Use at your own
+risks, if possible for good or interesting things.
+
 
 [CC0]: https://creativecommons.org/publicdomain/zero/1.0/deed.fr
