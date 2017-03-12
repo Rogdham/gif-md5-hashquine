@@ -33,6 +33,7 @@ class Hashquine(object):
         self.template_dir = template_dir
         self.out_filename = out_filename
         self.hash_img_coordinates = (102, 143)
+        self.md5_mask = '           d5    dead           '  # already in bg
         # read images
         self.background_blocks = self.read_gif('background.gif')
         self.chars_img_data = {}
@@ -107,6 +108,8 @@ class Hashquine(object):
         top, left = self.hash_img_coordinates
         for char_pos in range(32):
             left += self.char_width
+            if self.md5_mask[char_pos] != ' ':
+                continue
             for char in range(16):
                 char_img = graphic_control_extension
                 char_img += '\x2c{}\x00'.format(struct.pack(  # img descriptor
@@ -141,11 +144,29 @@ class Hashquine(object):
                 generated_gif += '\x21\xfe'
                 generated_gif += chr(pad_len)
                 generated_gif += '\x00' * pad_len  # any char would do
-        # end comment and add GIF trailer
-        generated_gif += '\x00\x3b'
+        # add a comment and bruteforce it until GIF md5 match the md5 mask
+        current_md5 = md5(generated_gif)
+        print 'Bruteforcing final md5...'
+        for garbage in xrange(1 << 32):  # 32 bits of bf should be enough
+            end = struct.pack('<BIBB',
+                              4, garbage,  # comment sub-block
+                              0,  # end comment
+                              0x3b)  # trailer
+            new_md5 = current_md5.copy()
+            new_md5.update(end)
+            for mask_char, md5_char in zip(self.md5_mask, new_md5.hexdigest()):
+                if mask_char != ' ' and mask_char != md5_char:
+                    break
+            else:
+                generated_gif += end
+                break
+        else:
+            raise ValueError('Did not find a GIF matching the md5 mask')
         # replace colls to show md5
         print 'Target md5:', md5(generated_gif).hexdigest()
         for char_pos, char in enumerate(md5(generated_gif).hexdigest()):
+            if self.md5_mask[char_pos] != ' ':
+                continue
             coll_pos, coll = alternatives[char_pos, int(char, 16)]
             generated_gif = (
                 generated_gif[:coll_pos] + coll +
