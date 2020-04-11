@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 #
 # Copyheart Rogdham, 2017
@@ -22,7 +22,7 @@ from hashlib import md5
 import collide
 
 
-class Hashquine(object):
+class Hashquine():
     """
     Create a hashquine
 
@@ -52,58 +52,58 @@ class Hashquine(object):
         Doing so makes sure it works well with Makefiles
         """
         generated_gif = self.generate()
-        with open(self.out_filename, 'w') as out_fd:
+        with open(self.out_filename, 'wb') as out_fd:
             out_fd.write(generated_gif)
 
     def read_gif(self, filename):
         """
         Read the data from the GIF image
 
-        Images must have a specific format: 16-colours pallet, etc.
+        Images must have a specific format: 16-colours pallete, etc.
         """
         blocks = {}
-        with open(os.path.join(self.template_dir, filename)) as gif_fd:
+        with open(os.path.join(self.template_dir, filename), 'rb') as gif_fd:
             blocks['header'] = gif_fd.read(6)
-            assert blocks['header'] in ('GIF87a', 'GIF89a')
+            assert blocks['header'] in (b'GIF87a', b'GIF89a')
             blocks['lcd'] = gif_fd.read(7)  # logical screen descriptor
-            assert blocks['lcd'].endswith('\xe3\x10\x00')  # gct of 16 colours
+            assert blocks['lcd'].endswith(b'\xe3\x10\x00')  # gct of 16 colours
             blocks['gct'] = gif_fd.read(16 * 3)  # global colour table
             blocks['img_descriptor'] = gif_fd.read(10)  # image descriptor
-            assert blocks['img_descriptor'][0] == '\x2c'
-            assert blocks['img_descriptor'][9] == '\x00'
+            assert blocks['img_descriptor'][0] == 0x2c
+            assert blocks['img_descriptor'][9] == 0
             # img data
             blocks['img_data'] = gif_fd.read(1)  # LZW min code size
             while True:  # img data sub-blocks
                 blocks['img_data'] += gif_fd.read(1)  # sub-block data size
-                if blocks['img_data'][-1] == '\x00':
+                if blocks['img_data'][-1] == 0:
                     break  # final sub-block (size 0)
-                blocks['img_data'] += gif_fd.read(ord(blocks['img_data'][-1]))
-            assert gif_fd.read(1) == '\x3b'  # trailer
+                blocks['img_data'] += gif_fd.read(blocks['img_data'][-1])
+            assert gif_fd.read(1) == b'\x3b'  # trailer
         return blocks
 
     def generate(self):
         """
         Generate the hashquine
         """
-        graphic_control_extension = '\x21\xf9\x04\x04\x02\x00\x00\x00'
+        graphic_control_extension = b'\x21\xf9\x04\x04\x02\x00\x00\x00'
         alternatives = {}  # (char_pos, char): (coll_pos, coll)
         # header
         generated_gif = self.background_blocks['header']
         generated_gif += self.background_blocks['lcd']
         generated_gif += self.background_blocks['gct']
         # place comment
-        comment = 'Copyheart Rogdham, 2017\n'
-        comment += '<3 Copying is an act of love. Please copy and share.\n\n'
-        comment += 'Released under the CC0 1.0 universel licence\nSee '
-        comment += 'https://creativecommons.org/publicdomain/zero/1.0/deed.fr'
-        comment += '\n'
-        generated_gif += '\x21\xfe{}{}\x00'.format(chr(len(comment)), comment)
+        comment = b'Copyheart Rogdham, 2017\n'
+        comment += b'<3 Copying is an act of love. Please copy and share.\n\n'
+        comment += b'Released under the CC0 1.0 universel licence\nSee '
+        comment += b'https://creativecommons.org/publicdomain/zero/1.0/deed.fr'
+        comment += b'\n'
+        generated_gif += b'\x21\xfe%s%s\x00' % (bytes([len(comment)]), comment)
         # place background
         generated_gif += graphic_control_extension
         generated_gif += self.background_blocks['img_descriptor']
         generated_gif += self.background_blocks['img_data']
         # start comment
-        generated_gif += '\x21\xfe'
+        generated_gif += b'\x21\xfe'
         # generate all possible md5 characters frames
         top, left = self.hash_img_coordinates
         for char_pos in range(32):
@@ -112,42 +112,42 @@ class Hashquine(object):
                 continue
             for char in range(16):
                 char_img = graphic_control_extension
-                char_img += '\x2c{}\x00'.format(struct.pack(  # img descriptor
-                    '<HHHH', left, top, self.char_width, self.char_height))
+                char_img += b'\x2c%s\x00' % struct.pack(  # img descriptor
+                    '<HHHH', left, top, self.char_width, self.char_height)
                 char_img += self.chars_img_data[char]
                 # add comment to align to a md5 block
                 coll_diff = collide.COLLISION_LAST_DIFF
                 align = 64 - (len(generated_gif) % 64)
-                generated_gif += chr(align - 1 + coll_diff)
-                generated_gif += '\x00' * (align - 1)  # any char would do
+                generated_gif += bytes([align - 1 + coll_diff])
+                generated_gif += b'\x00' * (align - 1)  # any char would do
                 # generate collision
                 while True:
-                    print 'Generating collision', char_pos * 16 + char + 1
+                    print('Generating collision', char_pos * 16 + char + 1)
                     coll_img, coll_nop = collide.collide(generated_gif)
                     assert coll_img[coll_diff] < coll_nop[coll_diff]
                     offset = collide.COLLISION_LEN - coll_diff - 1
-                    coll_p_img = ord(coll_img[coll_diff]) - offset
-                    coll_p_nop = ord(coll_nop[coll_diff]) - offset
+                    coll_p_img = coll_img[coll_diff] - offset
+                    coll_p_nop = coll_nop[coll_diff] - offset
                     pad_len = coll_p_nop - coll_p_img - len(char_img) - 4
                     if coll_p_img >= 0 and pad_len >= 0:
                         break
-                    print 'Unsatisfying collision, trying again'
+                    print('Unsatisfying collision, trying again')
                 # push collision
                 alternatives[char_pos, char] = (len(generated_gif), coll_img)
                 generated_gif += coll_nop
                 # continue comment up to image
-                generated_gif += '\x00' * coll_p_img  # any char would do
-                generated_gif += '\x00'  # end comment
+                generated_gif += b'\x00' * coll_p_img  # any char would do
+                generated_gif += b'\x00'  # end comment
                 # add image
                 generated_gif += char_img
                 # start comment and align with big comment (end of coll_nop)
-                generated_gif += '\x21\xfe'
-                generated_gif += chr(pad_len)
-                generated_gif += '\x00' * pad_len  # any char would do
+                generated_gif += b'\x21\xfe'
+                generated_gif += bytes([pad_len])
+                generated_gif += b'\x00' * pad_len  # any char would do
         # add a comment and bruteforce it until GIF md5 match the md5 mask
         current_md5 = md5(generated_gif)
-        print 'Bruteforcing final md5...'
-        for garbage in xrange(1 << 32):  # 32 bits of bf should be enough
+        print('Bruteforcing final md5...')
+        for garbage in range(1 << 32):  # 32 bits of bf should be enough
             end = struct.pack('<BIBB',
                               4, garbage,  # comment sub-block
                               0,  # end comment
@@ -163,7 +163,7 @@ class Hashquine(object):
         else:
             raise ValueError('Did not find a GIF matching the md5 mask')
         # replace colls to show md5
-        print 'Target md5:', md5(generated_gif).hexdigest()
+        print('Target md5:', md5(generated_gif).hexdigest())
         for char_pos, char in enumerate(md5(generated_gif).hexdigest()):
             if self.md5_mask[char_pos] != ' ':
                 continue
@@ -172,7 +172,7 @@ class Hashquine(object):
                 generated_gif[:coll_pos] + coll +
                 generated_gif[coll_pos + len(coll):]
             )
-        print 'Final md5: ', md5(generated_gif).hexdigest()
+        print('Final md5: ', md5(generated_gif).hexdigest())
         return generated_gif
 
 

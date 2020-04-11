@@ -16,27 +16,13 @@ Download and compile it from http://www.win.tue.nl/hashclash/
 """
 
 import os
-import shutil
 import subprocess
 import tempfile
-from contextlib import contextmanager
 from hashlib import md5
 
 
 COLLISION_LEN = 128  # fastcoll generate two MD5 blocks
 COLLISION_LAST_DIFF = 123
-
-
-@contextmanager
-def temporary_directory():
-    """
-    Wrap temporary directory handling to be used in a context manager
-
-    Similar to tempfile.TemporaryDirectory in Python 3.2+
-    """
-    path = tempfile.mkdtemp()
-    yield path
-    shutil.rmtree(path)
 
 
 def collide(prefix):
@@ -52,21 +38,21 @@ def collide(prefix):
     smaller than the second one
     """
     assert len(prefix) % 64 == 0
-    with temporary_directory() as tmp_path:
+    with tempfile.TemporaryDirectory() as tmp_path:
         prefix_filename = os.path.join(tmp_path, 'prefix')
         coll_a_filename = os.path.join(tmp_path, 'coll_a')
         coll_b_filename = os.path.join(tmp_path, 'coll_b')
-        with open(prefix_filename, 'w') as prefix_fd:
+        with open(prefix_filename, 'wb') as prefix_fd:
             prefix_fd.write(prefix)
         subprocess.check_call([
             './fastcoll',
             '-p', prefix_filename,
             '-o', coll_a_filename, coll_b_filename,
         ], stdout=subprocess.PIPE)
-        with open(coll_a_filename) as coll_a_fd:
-            coll_a = coll_a_fd.read()[-128:]
-        with open(coll_b_filename) as coll_b_fd:
-            coll_b = coll_b_fd.read()[-128:]
+        with open(coll_a_filename, 'rb') as coll_a_fd:
+            coll_a = coll_a_fd.read()[len(prefix):]
+        with open(coll_b_filename, 'rb') as coll_b_fd:
+            coll_b = coll_b_fd.read()[len(prefix):]
     assert coll_a != coll_b
     assert md5(prefix + coll_a).digest() == md5(prefix + coll_b).digest()
     assert len(coll_a) == len(coll_b) == COLLISION_LEN
